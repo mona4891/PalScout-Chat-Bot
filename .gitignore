@@ -1,0 +1,34 @@
+# ── Secrets and real config ──────────────────
+# Only config_template / the placeholder version should ever be
+# committed. Your real config.txt has API keys and passwords in it.
+config.txt
+
+# ── Runtime-generated data ───────────────────
+warnings.json
+bans.json
+memory.txt
+bot.log
+warning_log.txt
+ban_log.txt
+
+# ── Chat log (if it ends up copied into this folder) ─────
+ChatLog.txt
+
+# ── Python ────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# ── OS/editor junk ────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── PyInstaller build output (if you build the .exe later) ──
+build/
+dist/
+*.spec
