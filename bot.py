@@ -61,7 +61,7 @@ def build_bot():
     port = int(config.get("SERVER_PORT", "8212"))
     password = require(config, "SERVER_ADMIN_PASSWORD", "server admin password")
 
-    server_api = GameServerAPI(host, port, password)
+    server_api = GameServerAPI(host, port, password, bot_name=bot_name)
 
     if not server_api.test_connection():
         logger.error(

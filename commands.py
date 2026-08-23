@@ -38,8 +38,19 @@ class CommandHandler:
             "You have access to live game data including player positions, "
             "HP, levels, guilds, and nearby creatures. Use this information "
             "to provide helpful, contextual responses. Be friendly and "
-            "conversational. Keep responses concise but informative, since "
-            "this is in-game chat, not a long conversation."
+            "conversational.\n\n"
+            "STRICT FORMAT RULES (this is raw in-game chat text, not a "
+            "document, and these rules are never broken):\n"
+            "- Maximum 1-2 short sentences, under 40 words total.\n"
+            "- Plain text ONLY. Never use **, *, -, #, or any other "
+            "markdown or formatting symbols.\n"
+            "- No lists, no bullet points, no headers, no bold, no "
+            "italics -- just a normal spoken sentence.\n\n"
+            "Example of a GOOD reply: Your HP is low at 319/600, and a "
+            "level 22 Survivor is right next to you, so be careful.\n"
+            "Example of a BAD reply (never do this): You're low on HP "
+            "(319/600) and have a **Lv22 Scouting Party Survivor** right "
+            "next to you."
         )
 
     # ── The core AI question/answer flow ─────────────
@@ -66,10 +77,21 @@ class CommandHandler:
                 {"role": "user", "content": user_content},
             ]
 
-            return self.ai_chain.ask(messages)
+            return self._strip_markdown(self.ai_chain.ask(messages))
         except Exception as e:
             logger.error(f"[AI] Unexpected error building context or asking AI: {e}")
             return "An error occurred on my end. Try again."
+
+    @staticmethod
+    def _strip_markdown(text: str) -> str:
+        """
+        Safety net in case the AI ignores the plain-text instruction --
+        strips common markdown symbols so raw formatting characters never
+        show up literally in game chat.
+        """
+        for symbol in ("**", "__", "*", "_", "###", "##", "#", "`"):
+            text = text.replace(symbol, "")
+        return text
 
     # ── Permission checking ──────────────────────────
 

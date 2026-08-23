@@ -1,15 +1,20 @@
 """
 chat_listener.py
 ------------------------------------------------
-Watches the chat log file (written by the chat logging mod) and
-parses out real player messages in real time. The game server's own
-REST API cannot read incoming chat, so this file-tailing approach is
-what makes "respond to in-game chat" possible at all.
+Watches the chat log file (written by PalScout's own chat-logging
+mod, see /mods/PalScoutChatLogger/) and parses out real player
+messages in real time. The game server's own REST API cannot read
+incoming chat, so this file-tailing approach is what makes "respond
+to in-game chat" possible at all.
 
-Expected log line format:
-    2026-08-13 19:01:05 mona said test
+Log line format (written by our own mod, so this is guaranteed
+stable -- no timestamps or extra words to parse around):
+    PlayerName|Message text here
 
-SYSTEM lines (join/leave announcements) are skipped automatically.
+Since our mod fires on ALL chat broadcasts -- including the bot's own
+messages and Palworld's own join/logout system announcements, both of
+which come through as sender "SYSTEM" -- those are filtered out below
+so only real player messages reach the rest of the bot.
 """
 
 import os
@@ -33,7 +38,7 @@ def tail_chatlog(chatlog_path: str, on_message: Callable[[str, str], None], stop
     """
     if not os.path.exists(chatlog_path):
         logger.error(f"[CHATLOG] File not found: {chatlog_path}")
-        logger.error("[CHATLOG] Make sure the chat logging mod is installed and enabled.")
+        logger.error("[CHATLOG] Make sure the PalScoutChatLogger mod is installed and enabled.")
         return
 
     logger.info(f"[CHATLOG] Tailing: {chatlog_path}")
@@ -59,12 +64,13 @@ def tail_chatlog(chatlog_path: str, on_message: Callable[[str, str], None], stop
 
             parsed = _parse_chat_line(line)
             if parsed is None:
+                logger.warning(f"[CHATLOG] Skipping unparseable line: {line}")
                 continue
 
             player_name, message = parsed
 
             if player_name.upper() == "SYSTEM":
-                continue  # join/leave announcements, not real chat
+                continue  # bot's own announcements / join-leave events, not real player chat
 
             if not message.strip():
                 continue
@@ -80,19 +86,16 @@ def tail_chatlog(chatlog_path: str, on_message: Callable[[str, str], None], stop
 def _parse_chat_line(line: str):
     """
     Parses a single log line into (player_name, message).
-    Expected format: "<date> <time> <playername> said <message>"
+    Expected format (written by our own mod): "PlayerName|Message"
     Returns None if the line doesn't match this format.
     """
-    parts = line.split(" said ", 1)
+    parts = line.split("|", 1)
     if len(parts) != 2:
         return None
 
-    timestamp_and_name = parts[0]  # e.g. "2026-08-13 19:01:05 mona"
-    message = parts[1]
-
-    name_parts = timestamp_and_name.split()
-    if len(name_parts) < 3:
+    player_name, message = parts
+    player_name = player_name.strip()
+    if not player_name:
         return None
 
-    player_name = name_parts[2]
     return player_name, message

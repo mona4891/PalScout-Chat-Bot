@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class GameServerAPI:
     """REST API wrapper for the dedicated game server."""
 
-    def __init__(self, host: str, port: int, admin_password: str):
+    def __init__(self, host: str, port: int, admin_password: str, bot_name: str = None):
         self.base_url = f"http://{host}:{port}"
         self.session = requests.Session()
         self.session.auth = HTTPBasicAuth("admin", admin_password)
@@ -27,6 +27,11 @@ class GameServerAPI:
             "Accept": "application/json",
         })
         self.connected = False
+        # Since Palworld's /announce shows all bot messages under the
+        # generic "SYSTEM" sender, prefixing with the bot's name makes
+        # its responses visually distinguishable from other server
+        # announcements (join/leave messages, etc.) in chat.
+        self.chat_prefix = f"[{bot_name}] " if bot_name else ""
 
     def test_connection(self) -> bool:
         """Confirms the REST API is reachable and credentials are valid."""
@@ -44,15 +49,18 @@ class GameServerAPI:
             return False
 
     def send_chat(self, message: str) -> bool:
-        """Broadcasts a message into the game's chat."""
+        """Broadcasts a message into the game's chat, prefixed with the
+        bot's name so it's visually distinguishable from other SYSTEM
+        messages (Palworld labels all /announce messages as "SYSTEM")."""
+        full_message = f"{self.chat_prefix}{message}"
         try:
             resp = self.session.post(
                 f"{self.base_url}/v1/api/announce",
-                json={"message": message[:400]},
+                json={"message": full_message[:400]},
                 timeout=5,
             )
             if resp.status_code == 200:
-                logger.info(f"[BOT] {message}")
+                logger.info(f"[BOT] {full_message}")
                 return True
             logger.error(f"[SERVER] Send failed: status {resp.status_code}")
             return False
