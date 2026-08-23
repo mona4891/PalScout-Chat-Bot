@@ -15,7 +15,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 
 - Python 3.10+
 - A running Palworld dedicated server with `RESTAPIEnabled=True` set in `PalWorldSettings.ini`, launched with the `-enable-gamedata-api` flag
-- [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) and a chat-logging mod installed on the server (required for the bot to read in-game chat — Palworld's REST API can only send chat, not read it)
+- [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) installed on the server, plus PalScout's own chat-logging mod (included in this repo under `PalScoutChatLogger/` — required because Palworld's REST API can only send chat, not read it)
 - At least one AI provider API key (a free tier from [Groq](https://console.groq.com/keys) is enough to get started)
 
 ## Installation
@@ -25,12 +25,21 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
    ```
    pip install requests groq openai discord.py
    ```
-3. Run the bot once to generate a config file:
+3. Install [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) on your server if you haven't already (unzip into `Pal\Binaries\Win64`)
+4. Copy the `PalScoutChatLogger` folder from this repo into your server's `Pal\Binaries\Win64\Mods\` folder. The folder structure should look like:
+   ```
+   Mods\PalScoutChatLogger\
+   ├── enabled.txt
+   └── Scripts\
+       └── main.lua
+   ```
+5. Launch the server with the `-enable-gamedata-api` flag and check the UE4SS console for `[PalScoutChatLogger] Loaded and hooked into chat.` to confirm it loaded
+6. Run the bot once to generate a config file:
    ```
    python bot.py
    ```
-4. Open the generated `config.txt` and fill in your real values (server admin password, at least one AI API key, chat log path, admin Steam IDs)
-5. Run the bot again:
+7. Open the generated `config.txt` and fill in your real values (server admin password, at least one AI API key, the path to `PalScoutChat.log` — created next to the mod once it's running — and your admin Steam ID)
+8. Run the bot again:
    ```
    python bot.py
    ```
@@ -43,7 +52,7 @@ All settings live in `config.txt`, created automatically on first run. Key field
 |---|---|
 | `SERVER_ADMIN_PASSWORD` | Matches the `AdminPassword` set in your server's `PalWorldSettings.ini` |
 | `GROQ_API_KEY` / `CEREBRAS_API_KEY` / `MISTRAL_API_KEY` / `OPENROUTER_API_KEY` | AI provider keys — only one is required, more adds fallback resilience |
-| `CHATLOG_PATH` | Path to the chat log file written by your chat-logging mod |
+| `CHATLOG_PATH` | Path to `PalScoutChat.log`, written by the included chat-logging mod |
 | `ADMIN_STEAM_IDS` | Comma-separated Steam IDs allowed to use moderation commands |
 | `BOT_NAME` / `BOT_PREFIX` | The bot's display name and command prefix (default `!`) |
 | `DISCORD_BOT_TOKEN` / `DISCORD_CHANNEL_ID` | Optional, enables the Discord bridge |
@@ -69,25 +78,26 @@ Palworld's original RCON system has been marked deprecated by the developers, wi
 ## Project structure
 
 ```
-config.py           # Settings loader
-palworld_api.py      # REST API wrapper (server connection, chat, kick/ban, game data)
-ai_providers.py       # Multi-provider AI fallback chain
-chat_listener.py      # Reads incoming chat from the chat log file
-moderation.py         # Warnings, kicks, bans, and persistence
-memory.py             # Permanent memory + recent chat history
-commands.py           # Command routing and permission checks
-discord_bridge.py     # Optional Discord integration
-bot.py                # Main entry point
+config.py             # Settings loader
+palworld_api.py       # REST API wrapper (server connection, chat, kick/ban, game data)
+ai_providers.py        # Multi-provider AI fallback chain
+chat_listener.py       # Reads incoming chat from the chat log file
+moderation.py          # Warnings, kicks, bans, and persistence
+memory.py              # Permanent memory + recent chat history
+commands.py            # Command routing and permission checks
+discord_bridge.py      # Optional Discord integration
+bot.py                 # Main entry point
+PalScoutChatLogger/    # UE4SS Lua mod — writes chat to a log file the bot can read
 ```
 
 ## Known limitations
 
-- Requires a third-party chat-logging mod, since Palworld's REST API cannot read incoming chat on its own
+- Requires [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) plus the included chat-logging mod, since Palworld's REST API cannot read incoming chat on its own
 - Position data assumes Unreal Engine units (~1 unit ≈ 1cm); distance calculations are approximate
 
 ## License
 
-MIT
+MIT License — see `LICENSE` for details.
 
 ## Support
 
