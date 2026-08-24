@@ -16,7 +16,7 @@ import time
 import logging
 import threading
 
-from config import load_config, require
+from config import load_config, require, BASE_DIR
 from palworld_api import GameServerAPI
 from ai_providers import AIProviderChain
 from moderation import ModerationSystem, ChatFilter
@@ -25,7 +25,10 @@ from commands import CommandHandler
 from chat_listener import tail_chatlog
 import discord_bridge
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Reuse the same BASE_DIR logic config.py already worked out --
+# correctly resolves to the .exe's real folder when frozen by
+# PyInstaller, or the script's folder otherwise. Avoids duplicating
+# (and risking a mismatch in) the same detection logic in two places.
 
 # ── Logging setup ─────────────────────────────────
 logging.basicConfig(

@@ -61,7 +61,7 @@ class AIProviderChain:
     def _call_groq(self, messages: List[Dict]) -> str:
         client = groq.Groq(api_key=self.config.get("GROQ_API_KEY"))
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=messages,
             temperature=0.7,
             max_tokens=400,
@@ -71,7 +71,7 @@ class AIProviderChain:
     def _call_cerebras(self, messages: List[Dict]) -> str:
         client = Cerebras(api_key=self.config.get("CEREBRAS_API_KEY"))
         response = client.chat.completions.create(
-            model="llama3.1-8b",
+            model="gpt-oss-120b",
             messages=messages,
             temperature=0.7,
             max_tokens=400,

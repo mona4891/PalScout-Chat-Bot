@@ -12,7 +12,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _get_base_dir() -> str:
+    """
+    Returns the folder config.txt (and other data files) should live
+    in. When running as a normal Python script, that's just the
+    script's own folder. When running as a PyInstaller-built exe,
+    __file__ points to a temporary internal extraction folder instead
+    of where the .exe actually sits -- sys.executable gives the real
+    location in that case.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+BASE_DIR = _get_base_dir()
 CONFIG_FILE = os.path.join(BASE_DIR, "config.txt")
 
 CONFIG_TEMPLATE = """# ─────────────────────────────────────────────
