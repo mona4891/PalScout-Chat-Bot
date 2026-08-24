@@ -19,7 +19,7 @@ import threading
 from config import load_config, require
 from palworld_api import GameServerAPI
 from ai_providers import AIProviderChain
-from moderation import ModerationSystem
+from moderation import ModerationSystem, ChatFilter
 from memory import PermanentMemory, ChatHistory
 from commands import CommandHandler
 from chat_listener import tail_chatlog
@@ -83,6 +83,13 @@ def build_bot():
     if not admin_steam_ids:
         logger.warning("[CONFIG] No ADMIN_STEAM_IDS set -- moderation commands will be unusable until this is configured.")
 
+    anti_spam_enabled = config.get("ANTI_SPAM_ENABLED", "true").lower() == "true"
+    cooldown_seconds = int(config.get("COOLDOWN_SECONDS", "10"))
+
+    web_search_enabled = config.get("WEB_SEARCH_ENABLED", "true").lower() == "true"
+    youtube_search_enabled = config.get("YOUTUBE_SEARCH_ENABLED", "true").lower() == "true"
+    youtube_api_key = config.get("YOUTUBE_API_KEY")  # optional -- falls back to web search if missing
+
     command_handler = CommandHandler(
         server_api=server_api,
         ai_chain=ai_chain,
@@ -92,35 +99,61 @@ def build_bot():
         bot_name=bot_name,
         bot_prefix=bot_prefix,
         admin_steam_ids=admin_steam_ids,
+        anti_spam_enabled=anti_spam_enabled,
+        cooldown_seconds=cooldown_seconds,
+        web_search_enabled=web_search_enabled,
+        youtube_search_enabled=youtube_search_enabled,
+        youtube_api_key=youtube_api_key,
     )
 
-    return command_handler, server_api, config, bot_name, bot_prefix, chat_history
+    auto_mod_enabled = config.get("AUTO_MODERATION_ENABLED", "false").lower() == "true"
+    banned_words_raw = config.get("BANNED_WORDS", "")
+    banned_words = [w.strip() for w in banned_words_raw.split(",") if w.strip()]
+    chat_filter = ChatFilter(enabled=auto_mod_enabled, banned_words=banned_words)
+    if auto_mod_enabled:
+        logger.info(f"[AUTOMOD] Auto-moderation enabled with {len(banned_words)} banned word(s).")
+    else:
+        logger.info("[AUTOMOD] Auto-moderation is disabled (AUTO_MODERATION_ENABLED=false).")
+
+    return command_handler, server_api, config, bot_name, bot_prefix, chat_history, chat_filter
 
 
 def make_chat_message_handler(command_handler: CommandHandler, server_api: GameServerAPI,
-                                bot_prefix: str, chat_history: ChatHistory):
+                                bot_prefix: str, chat_history: ChatHistory, moderation: ModerationSystem,
+                                chat_filter: ChatFilter):
     """
     Returns the function that gets called for every real chat message
     detected by the chat listener. Records it to chat history, and if
     it's a command (starts with bot_prefix), routes it through the
     command handler and sends the response back into the game.
+
+    Regular (non-command) messages are also passed through the
+    ChatFilter if auto-moderation is enabled -- a violation issues a
+    warning through the normal warning system, so it benefits from
+    the same auto-kick-at-limit escalation as manual warnings.
     """
     def handle_chat_message(player_name: str, message: str):
         chat_history.add(player_name, message)
 
-        if not message.startswith(bot_prefix):
-            return  # regular chat between players, not a bot command
+        if message.startswith(bot_prefix):
+            parts = message[len(bot_prefix):].split()
+            if not parts:
+                return
 
-        parts = message[len(bot_prefix):].split()
-        if not parts:
+            command = parts[0].lower()
+            args = parts[1:]
+
+            response = command_handler.handle(command, args, player_name)
+            if response:
+                server_api.send_chat(response)
             return
 
-        command = parts[0].lower()
-        args = parts[1:]
-
-        response = command_handler.handle(command, args, player_name)
-        if response:
-            server_api.send_chat(response)
+        # Not a command -- regular chat, check it against the filter
+        # (a no-op if auto-moderation is disabled).
+        violation_reason = chat_filter.check_message(message)
+        if violation_reason:
+            result = moderation.warn_player(player_name, f"Auto-moderation: {violation_reason}", issued_by="AutoMod")
+            server_api.send_chat(result)
 
     return handle_chat_message
 
@@ -144,7 +177,7 @@ def main():
     logger.info("Bot starting...")
     logger.info("=" * 50)
 
-    command_handler, server_api, config, bot_name, bot_prefix, chat_history = build_bot()
+    command_handler, server_api, config, bot_name, bot_prefix, chat_history, chat_filter = build_bot()
 
     chatlog_path = config.get("CHATLOG_PATH", os.path.join(BASE_DIR, "ChatLog.txt"))
     if not os.path.exists(chatlog_path):
@@ -154,7 +187,9 @@ def main():
 
     server_api.send_chat(f"{bot_name} online! Type {bot_prefix}help for commands.")
 
-    on_message = make_chat_message_handler(command_handler, server_api, bot_prefix, chat_history)
+    on_message = make_chat_message_handler(
+        command_handler, server_api, bot_prefix, chat_history, command_handler.moderation, chat_filter
+    )
 
     if os.path.exists(chatlog_path):
         chat_thread = threading.Thread(

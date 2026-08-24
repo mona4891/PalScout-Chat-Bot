@@ -189,3 +189,55 @@ class ModerationSystem:
             pid: entry for pid, entry in self.bans.items()
             if entry.get("expires_at") and now > entry["expires_at"]
         }
+
+
+class ChatFilter:
+    """
+    Scans regular chat messages (not commands) for banned words,
+    excessive caps, and repeated-character spam. Entirely optional --
+    controlled by the AUTO_MODERATION_ENABLED config toggle.
+
+    Kept intentionally simple (word list + a couple of heuristics)
+    rather than anything AI-based, so it's fast and has no extra cost
+    or latency on every single chat message.
+    """
+
+    def __init__(self, enabled: bool = False, banned_words: Optional[list] = None,
+                 caps_threshold: float = 0.7, caps_min_length: int = 10,
+                 repeated_char_threshold: int = 8):
+        self.enabled = enabled
+        self.banned_words = [w.strip().lower() for w in (banned_words or []) if w.strip()]
+        self.caps_threshold = caps_threshold
+        self.caps_min_length = caps_min_length
+        self.repeated_char_threshold = repeated_char_threshold
+
+    def check_message(self, message: str) -> Optional[str]:
+        """
+        Returns a short reason string if the message violates a rule,
+        or None if it's fine. Returns None immediately if disabled.
+        """
+        if not self.enabled:
+            return None
+
+        lowered = message.lower()
+
+        for word in self.banned_words:
+            if word in lowered:
+                return "used a banned word"
+
+        letters = [c for c in message if c.isalpha()]
+        if len(letters) >= self.caps_min_length:
+            caps_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
+            if caps_ratio >= self.caps_threshold:
+                return "excessive caps"
+
+        run_length = 1
+        for i in range(1, len(message)):
+            if message[i] == message[i - 1]:
+                run_length += 1
+                if run_length >= self.repeated_char_threshold:
+                    return "character spam"
+            else:
+                run_length = 1
+
+        return None

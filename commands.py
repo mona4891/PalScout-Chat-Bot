@@ -12,7 +12,10 @@ through the AI provider fallback chain.
 """
 
 import logging
+import time
 from typing import List, Optional
+
+import search
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,10 @@ class CommandHandler:
     """
 
     def __init__(self, server_api, ai_chain, moderation, permanent_memory,
-                 chat_history, bot_name: str, bot_prefix: str, admin_steam_ids: List[str] = None):
+                 chat_history, bot_name: str, bot_prefix: str, admin_steam_ids: List[str] = None,
+                 anti_spam_enabled: bool = True, cooldown_seconds: int = 10,
+                 web_search_enabled: bool = True, youtube_search_enabled: bool = True,
+                 youtube_api_key: str = None):
         self.server_api = server_api
         self.ai_chain = ai_chain
         self.moderation = moderation
@@ -33,6 +39,12 @@ class CommandHandler:
         self.bot_name = bot_name
         self.bot_prefix = bot_prefix
         self.admin_steam_ids = set(admin_steam_ids or [])
+        self.anti_spam_enabled = anti_spam_enabled
+        self.cooldown_seconds = cooldown_seconds
+        self.web_search_enabled = web_search_enabled
+        self.youtube_search_enabled = youtube_search_enabled
+        self.youtube_api_key = youtube_api_key
+        self._last_command_time: dict = {}  # player_name -> timestamp of last command
         self.system_prompt = (
             f"You are {bot_name}, a helpful AI assistant for a game server. "
             "You have access to live game data including player positions, "
@@ -58,7 +70,8 @@ class CommandHandler:
     def ask_ai(self, player_name: str, question: str) -> str:
         """
         Builds full context (game state + permanent memory + recent
-        chat) and sends the question through the AI provider chain.
+        chat + web search results if the question needs current info)
+        and sends the question through the AI provider chain.
         """
         logger.info(f"[AI] {player_name} asked: {question}")
         try:
@@ -70,7 +83,14 @@ class CommandHandler:
             if memory_context:
                 system += f"\n\nPermanent memory:\n{memory_context}"
 
-            user_content = f"{game_context}\n\n{chat_context}\n\n{player_name} asks: {question}"
+            search_context = ""
+            if self.web_search_enabled and search.needs_current_info(question):
+                logger.info(f"[SEARCH] Question looks like it needs current info, searching: {question}")
+                results = search.web_search(question)
+                if results:
+                    search_context = f"\n\nCurrent web search results (use these for up-to-date info):\n{results}"
+
+            user_content = f"{game_context}\n\n{chat_context}{search_context}\n\n{player_name} asks: {question}"
 
             messages = [
                 {"role": "system", "content": system},
@@ -111,6 +131,23 @@ class CommandHandler:
         steam_id = player.get("userid") or player.get("steamId") or ""
         return steam_id in self.admin_steam_ids
 
+    def _check_cooldown(self, player_name: str) -> bool:
+        """
+        Returns True if the player is allowed to run a command right
+        now. Admins are always exempt. Updates the last-used timestamp
+        as a side effect when allowed.
+        """
+        if not self.anti_spam_enabled or self.is_admin(player_name):
+            return True
+
+        now = time.time()
+        last_used = self._last_command_time.get(player_name, 0)
+        if now - last_used < self.cooldown_seconds:
+            return False
+
+        self._last_command_time[player_name] = now
+        return True
+
     # ── Command dispatch ──────────────────────────────
 
     # Commands that require admin permission -- everyone else is
@@ -133,6 +170,8 @@ class CommandHandler:
             "clearwarnings": self._cmd_clear_warnings,
             "say": self._cmd_say,
             "ai": self._cmd_ai,
+            "search": self._cmd_search,
+            "youtube": self._cmd_youtube,
             "help": self._cmd_help,
         }
 
@@ -143,6 +182,9 @@ class CommandHandler:
         if command in self.ADMIN_ONLY_COMMANDS and not self.is_admin(player_name):
             logger.warning(f"[COMMANDS] {player_name} attempted admin command '{command}' without permission.")
             return "You don't have permission to use that command."
+
+        if not self._check_cooldown(player_name):
+            return None  # silently ignore spammed commands rather than adding more chat noise
 
         return handler(args, player_name)
 
@@ -163,6 +205,8 @@ class CommandHandler:
         if len(args) < 1:
             return f"Usage: {self.bot_prefix}kick <player_name> [reason]"
         target = args[0]
+        if self.is_admin(target):
+            return "Admins cannot be kicked or banned through this command."
         reason = " ".join(args[1:]) if len(args) > 1 else "Kicked by admin"
         return self.moderation.kick_player(target, reason, issued_by=player_name)
 
@@ -170,6 +214,8 @@ class CommandHandler:
         if len(args) < 1:
             return f"Usage: {self.bot_prefix}ban <player_name> [reason]"
         target = args[0]
+        if self.is_admin(target):
+            return "Admins cannot be kicked or banned through this command."
         reason = " ".join(args[1:]) if len(args) > 1 else "Banned by admin"
         return self.moderation.ban_player(target, reason, issued_by=player_name)
 
@@ -177,6 +223,8 @@ class CommandHandler:
         if len(args) < 1:
             return f"Usage: {self.bot_prefix}warn <player_name> [reason]"
         target = args[0]
+        if self.is_admin(target):
+            return "Admins cannot be warned through this command."
         reason = " ".join(args[1:]) if len(args) > 1 else "No reason given"
         return self.moderation.warn_player(target, reason, issued_by=player_name)
 
@@ -201,9 +249,41 @@ class CommandHandler:
 
     def _cmd_ai(self, args: List[str], player_name: str) -> str:
         if len(args) < 1:
-            return f"Usage: {self.bot_prefix}ai <question>"
+            return f"Usage: {self.bot_prefix}ai <question>  (or: {self.bot_prefix}ai remember <note>)"
+
+        if args[0].lower() == "remember":
+            if len(args) < 2:
+                return f"Usage: {self.bot_prefix}ai remember <note to save>"
+            note = " ".join(args[1:])
+            self.permanent_memory.append(f"{player_name}: {note}")
+            return "Got it, I'll remember that."
+
         question = " ".join(args)
         return self.ask_ai(player_name, question)
+
+    def _cmd_search(self, args: List[str], player_name: str) -> str:
+        if not self.web_search_enabled:
+            return "Web search is currently disabled."
+        if len(args) < 1:
+            return f"Usage: {self.bot_prefix}search <query>"
+        query = " ".join(args)
+        results = search.web_search(query)
+        if not results:
+            return f"No results found for '{query}'."
+        # Keep this short for in-game chat -- just the first result line
+        first_line = results.split("\n")[0]
+        return first_line[:300]
+
+    def _cmd_youtube(self, args: List[str], player_name: str) -> str:
+        if not self.youtube_search_enabled:
+            return "YouTube search is currently disabled."
+        if len(args) < 1:
+            return f"Usage: {self.bot_prefix}youtube <query>"
+        query = " ".join(args)
+        result = search.youtube_search(query, api_key=self.youtube_api_key)
+        if not result:
+            return f"No video found for '{query}'."
+        return result
 
     def _cmd_help(self, args: List[str], player_name: str) -> str:
         p = self.bot_prefix
@@ -218,5 +298,8 @@ class CommandHandler:
             f"{p}clearwarnings <name> - Clear a player's warnings\n"
             f"{p}say <message> - Send a chat message\n"
             f"{p}ai <question> - Ask the AI (uses live game context)\n"
+            f"{p}ai remember <note> - Save a permanent note for the AI\n"
+            f"{p}search <query> - Search the web\n"
+            f"{p}youtube <query> - Find a YouTube video\n"
             f"{p}help - Show this help"
         )

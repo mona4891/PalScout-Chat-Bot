@@ -57,6 +57,31 @@ ADMIN_STEAM_IDS=your-steamid-here
 # How many warnings before an automatic kick
 MAX_WARNINGS_BEFORE_KICK=3
 
+# ── Anti-Spam ─────────────────────────────────
+# Prevents players from spamming commands (especially !ai, which costs
+# API calls). Admins are always exempt from cooldown.
+ANTI_SPAM_ENABLED=true
+COOLDOWN_SECONDS=10
+
+# ── Auto-Moderation ───────────────────────────
+# Automatically scans regular chat (not just commands) for banned
+# words, excessive caps, and character spam, and issues a warning
+# through the normal warning system when triggered. Off by default --
+# turn on and tune BANNED_WORDS once you're ready to use it.
+AUTO_MODERATION_ENABLED=false
+BANNED_WORDS=
+
+# ── Search ────────────────────────────────────
+# Web search auto-triggers inside !ai when a question looks like it
+# needs current info (weather, news, scores, etc.), and is also
+# available directly via !search <query>.
+# YouTube search needs no API key to work (falls back to a web
+# search), but providing one gives more reliable, direct video links.
+# Get a free key at: https://console.cloud.google.com/apis/library/youtube.googleapis.com
+WEB_SEARCH_ENABLED=true
+YOUTUBE_SEARCH_ENABLED=true
+YOUTUBE_API_KEY=your-youtube-api-key-here
+
 # ── Discord Bridge (optional) ────────────────
 DISCORD_BOT_TOKEN=your-bot-token-here
 DISCORD_CHANNEL_ID=your-channel-id-here
