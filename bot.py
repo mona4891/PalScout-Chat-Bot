@@ -31,11 +31,23 @@ import discord_bridge
 # (and risking a mismatch in) the same detection logic in two places.
 
 # ── Logging setup ─────────────────────────────────
+# Reconfigure stdout to UTF-8 where possible -- on Windows, the
+# console's default encoding (cp1252) can't display many Unicode
+# characters (e.g. the "narrow no-break space" some AI models use in
+# their output), which previously crashed the logging call entirely
+# rather than just displaying the character oddly. This is a no-op
+# on platforms where stdout is already UTF-8.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(BASE_DIR, "bot.log")),
+        logging.FileHandler(os.path.join(BASE_DIR, "bot.log"), encoding="utf-8"),
         logging.StreamHandler(),
     ],
 )

@@ -51,6 +51,15 @@ class CommandHandler:
             "HP, levels, guilds, and nearby creatures. Use this information "
             "to provide helpful, contextual responses. Be friendly and "
             "conversational.\n\n"
+            "IMPORTANT -- YOU CANNOT PERFORM MODERATION ACTIONS YOURSELF: "
+            "you have no ability to actually kick, ban, or warn anyone, "
+            "even if asked to. If someone asks you (in conversation) to "
+            "kick, ban, or warn a player, do NOT claim or pretend you did "
+            f"it. Instead, tell them the real command to use, e.g. "
+            f"'{bot_prefix}kick <name>', '{bot_prefix}ban <name>', or "
+            f"'{bot_prefix}warn <name>' -- those are separate commands "
+            "an admin has to type directly, not something you can trigger "
+            "by being asked in a question.\n\n"
             "STRICT FORMAT RULES (this is raw in-game chat text, not a "
             "document, and these rules are never broken):\n"
             "- Maximum 1-2 short sentences, under 40 words total.\n"
@@ -126,10 +135,13 @@ class CommandHandler:
 
         player = self.server_api.find_player_by_name(player_name)
         if not player:
+            logger.warning(f"[COMMANDS] is_admin: could not find '{player_name}' among connected players -- treating as non-admin.")
             return False  # can't verify identity if they're not found online
 
         steam_id = player.get("userid") or player.get("steamId") or ""
-        return steam_id in self.admin_steam_ids
+        is_match = steam_id in self.admin_steam_ids
+        logger.info(f"[COMMANDS] is_admin check for '{player_name}': steam_id='{steam_id}', admin={is_match}")
+        return is_match
 
     def _check_cooldown(self, player_name: str) -> bool:
         """

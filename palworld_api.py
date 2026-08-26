@@ -51,8 +51,16 @@ class GameServerAPI:
     def send_chat(self, message: str) -> bool:
         """Broadcasts a message into the game's chat, prefixed with the
         bot's name so it's visually distinguishable from other SYSTEM
-        messages (Palworld labels all /announce messages as "SYSTEM")."""
-        full_message = f"{self.chat_prefix}{message}"
+        messages (Palworld labels all /announce messages as "SYSTEM").
+
+        Multi-line messages are flattened to a single line first: our
+        chat-logging mod writes one physical log line per message, so
+        embedded newlines (e.g. from !help's multi-line command list)
+        would otherwise split into multiple log lines with no sender
+        prefix on the extra lines, which the bot then logs as noisy
+        "unparseable" warnings even though nothing is actually broken."""
+        flat_message = message.replace("\n", " | ")
+        full_message = f"{self.chat_prefix}{flat_message}"
         try:
             resp = self.session.post(
                 f"{self.base_url}/v1/api/announce",
@@ -69,20 +77,31 @@ class GameServerAPI:
             return False
 
     def get_players(self) -> List[Dict]:
-        """Returns the list of currently connected players."""
-        try:
-            resp = self.session.get(f"{self.base_url}/v1/api/players", timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                # Some server versions wrap the list in a "players" key,
-                # others return it directly -- handle both.
-                if isinstance(data, dict):
-                    return data.get("players", [])
-                return data
-            return []
-        except requests.RequestException as e:
-            logger.error(f"[SERVER] Get players failed: {e}")
-            return []
+        """
+        Returns the list of currently connected players, normalized to
+        always have "name" and "userid" keys regardless of the
+        underlying field names.
+
+        Deliberately built from /game-data's ActorData rather than
+        /v1/api/players -- ActorData's field names (NickName, userid)
+        have been directly confirmed from a live server response,
+        while /v1/api/players's exact schema was only ever assumed,
+        not verified, which caused a real bug: player lookups (and
+        therefore admin permission checks) silently failed because
+        the assumed field name "name" didn't match reality.
+        """
+        game_data = self.get_game_data()
+        actors = game_data.get("ActorData", [])
+        players = []
+        for a in actors:
+            if a.get("UnitType") != "Player":
+                continue
+            players.append({
+                "name": a.get("NickName", ""),
+                "userid": a.get("userid", ""),
+                "raw": a,  # keep the original data available if needed
+            })
+        return players
 
     def get_game_data(self) -> Dict:
         """
@@ -108,6 +127,7 @@ class GameServerAPI:
         for p in self.get_players():
             if p.get("name", "").lower() == name.lower():
                 return p
+        logger.warning(f"[SERVER] find_player_by_name: no match for '{name}' among currently connected players.")
         return None
 
     def kick_player(self, player_id: str, reason: str = "") -> bool:
