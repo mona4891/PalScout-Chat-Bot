@@ -57,11 +57,17 @@ class AIProviderChain:
         ]
 
     # ── Individual provider calls ────────────────────
+    # Model names are read from config.txt rather than hardcoded here.
+    # Providers deprecate specific model names periodically (this has
+    # already happened twice during development -- Groq and Cerebras
+    # both retired the models originally used here), and previously
+    # that meant users had to wait for a code update to fix a broken
+    # provider. Now they can just edit config.txt themselves.
 
     def _call_groq(self, messages: List[Dict]) -> str:
         client = groq.Groq(api_key=self.config.get("GROQ_API_KEY"))
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=self.config.get("GROQ_MODEL", "openai/gpt-oss-20b"),
             messages=messages,
             temperature=0.7,
             max_tokens=400,
@@ -71,7 +77,7 @@ class AIProviderChain:
     def _call_cerebras(self, messages: List[Dict]) -> str:
         client = Cerebras(api_key=self.config.get("CEREBRAS_API_KEY"))
         response = client.chat.completions.create(
-            model="gpt-oss-120b",
+            model=self.config.get("CEREBRAS_MODEL", "gpt-oss-120b"),
             messages=messages,
             temperature=0.7,
             max_tokens=400,
@@ -84,7 +90,7 @@ class AIProviderChain:
             base_url="https://api.mistral.ai/v1",
         )
         response = client.chat.completions.create(
-            model="mistral-tiny",
+            model=self.config.get("MISTRAL_MODEL", "mistral-tiny"),
             messages=messages,
             temperature=0.7,
             max_tokens=400,
@@ -97,7 +103,7 @@ class AIProviderChain:
             base_url="https://openrouter.ai/api/v1",
         )
         response = client.chat.completions.create(
-            model="meta-llama/llama-3.1-8b-instruct:free",
+            model=self.config.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),
             messages=messages,
             temperature=0.7,
             max_tokens=400,
@@ -108,7 +114,7 @@ class AIProviderChain:
         """Calls a locally-running Ollama instance, if enabled."""
         response = requests.post(
             "http://localhost:11434/api/chat",
-            json={"model": "llama2", "messages": messages},
+            json={"model": self.config.get("LOCAL_MODEL", "llama2"), "messages": messages},
             timeout=30,
         )
         return response.json().get("message", {}).get("content", "")

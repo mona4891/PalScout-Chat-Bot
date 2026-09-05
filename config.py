@@ -42,6 +42,25 @@ CEREBRAS_API_KEY=your-cerebras-key-here
 MISTRAL_API_KEY=your-mistral-key-here
 OPENROUTER_API_KEY=your-openrouter-key-here
 
+# ── AI Provider Model Names ───────────────────
+# Which specific model each provider uses. AI providers periodically
+# retire/rename models with little warning -- if a provider suddenly
+# stops working and the bot log shows a "model not found" type error,
+# check that provider's website for their current model names and
+# update the matching line below. No code changes needed.
+GROQ_MODEL=openai/gpt-oss-20b
+CEREBRAS_MODEL=gpt-oss-120b
+MISTRAL_MODEL=mistral-tiny
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+# Only used if you run a local Ollama instance (LOCAL_AI_ENABLED=true)
+LOCAL_MODEL=llama2
+
+# ── Local AI (optional) ───────────────────────
+# If true, tries a locally-running Ollama instance before any cloud
+# provider -- free and unlimited, but requires you to have Ollama
+# installed and running yourself.
+LOCAL_AI_ENABLED=false
+
 # ── Game Server Connection ───────────────────
 # Enable RESTAPIEnabled=True in PalWorldSettings.ini
 # Launch the server with: -enable-gamedata-api
