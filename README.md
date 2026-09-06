@@ -2,7 +2,7 @@
 
 PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated servers. Players can chat with an AI directly in-game, and its answers are grounded in **live game data** — your actual HP, level, position, and nearby creatures — not just generic chat.
 
-**[Download the latest release](../../releases/latest)** — a standalone `.exe` build is available, no Python installation required.
+**[Download the latest release](https://github.com/mona4891/PalScout-Chat-Bot/releases/latest)** — a standalone `.exe` build is available, no Python installation required.
 
 ## Features
 
@@ -29,7 +29,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 
 ### Option A — prebuilt .exe (recommended, no Python needed)
 
-1. Download `PalScout.exe` from the [latest release](../../releases/latest)
+1. Download `PalScout.exe` from the [latest release](https://github.com/mona4891/PalScout-Chat-Bot)
 2. Follow steps 3–5 below to install UE4SS and the chat-logging mod
 3. Run `PalScout.exe` once to generate a `config.txt` template next to it
 4. Fill in `config.txt`, then run `PalScout.exe` again
@@ -68,6 +68,8 @@ All settings live in `config.txt`, created automatically on first run. Key field
 |---|---|
 | `SERVER_ADMIN_PASSWORD` | Matches the `AdminPassword` set in your server's `PalWorldSettings.ini` |
 | `GROQ_API_KEY` / `CEREBRAS_API_KEY` / `MISTRAL_API_KEY` / `OPENROUTER_API_KEY` | AI provider keys — only one is required, more adds fallback resilience |
+| `GROQ_MODEL` / `CEREBRAS_MODEL` / `MISTRAL_MODEL` / `OPENROUTER_MODEL` / `LOCAL_MODEL` | The specific model each provider uses. Editable here directly — if a provider retires a model name, just update it, no code changes needed |
+| `LOCAL_AI_ENABLED` | Set to `true` to try a locally-running Ollama instance before any cloud provider |
 | `CHATLOG_PATH` | Path to `PalScoutChat.log`, written by the included chat-logging mod |
 | `ADMIN_STEAM_IDS` | Comma-separated Steam IDs allowed to use moderation commands |
 | `BOT_NAME` / `BOT_PREFIX` | The bot's display name and command prefix (default `!`) |
@@ -81,7 +83,7 @@ All settings live in `config.txt`, created automatically on first run. Key field
 
 | Command | Description | Access |
 |---|---|---|
-| `!ai <question>` | Ask the AI anything — answers use live game data, auto-searches the web if needed | Everyone |
+| `!ai <question>` | Ask the AI anything — answers use live game data, auto-searches the web if needed. Note: the AI can only *talk about* moderation, it cannot perform kicks/bans/warns itself — use the real commands below for that | Everyone |
 | `!ai remember <note>` | Save a permanent note for the AI to reference later | Everyone |
 | `!search <query>` | Search the web directly | Everyone |
 | `!youtube <query>` | Find a YouTube video | Everyone |
