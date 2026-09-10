@@ -2,7 +2,12 @@
 
 PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated servers. Players can chat with an AI directly in-game, and its answers are grounded in **live game data** — your actual HP, level, position, and nearby creatures — not just generic chat.
 
-**[Download the latest release](https://github.com/mona4891/PalScout-Chat-Bot/releases/latest)** — a standalone `.exe` build is available, no Python installation required.
+## Where to get it
+
+- **[GitHub Releases](https://github.com/mona4891/PalScout-Chat-Bot/releases/latest)** — source code and the standalone `.exe`, no Python installation required
+- **[CurseForge](https://www.curseforge.com/palworld/miscellaneous/palscout)**
+- **[Thunderstore](https://thunderstore.io/c/palworld/p/PalScout/PalScout/)**
+- **Steam Workshop** — hosts the companion [PalScoutChatLogger](https://steamcommunity.com/sharedfiles/filedetails/?id=3798992368) mod only. The full bot isn't distributable through Workshop (it depends on an external application, which Workshop's package format doesn't support) — get PalScout itself from one of the links above.
 
 ## Features
 
@@ -29,7 +34,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 
 ### Option A — prebuilt .exe (recommended, no Python needed)
 
-1. Download `PalScout.exe` from the [latest release](https://github.com/mona4891/PalScout-Chat-Bot)
+1. Download `PalScout.exe` from the [latest release](https://github.com/mona4891/PalScout-Chat-Bot/releases/latest)
 2. Follow steps 3–5 below to install UE4SS and the chat-logging mod
 3. Run `PalScout.exe` once to generate a `config.txt` template next to it
 4. Fill in `config.txt`, then run `PalScout.exe` again
@@ -121,6 +126,10 @@ PalScoutChatLogger/    # UE4SS Lua mod — writes chat to a log file the bot can
 - Requires [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) plus the included chat-logging mod, since Palworld's REST API cannot read incoming chat on its own
 - Position data assumes Unreal Engine units (~1 unit ≈ 1cm); distance calculations are approximate
 - Antivirus software may flag the prebuilt `.exe` on first run — a common false positive for unsigned PyInstaller builds, not a sign of anything malicious (source is fully available in this repo)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 

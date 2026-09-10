@@ -1,5 +1,13 @@
 # Changelog
 
+## Distribution
+
+PalScout is now available on multiple platforms:
+- [GitHub](https://github.com/mona4891/PalScout-Chat-Bot) — source code and releases
+- [CurseForge](https://www.curseforge.com/palworld/miscellaneous/palscout)
+- [Thunderstore](https://thunderstore.io/c/palworld/p/PalScout/PalScout/)
+- Steam Workshop — the companion `PalScoutChatLogger` mod only (the full bot isn't distributable through Workshop, see the mod's own page for details): https://steamcommunity.com/sharedfiles/filedetails/?id=3798992368
+
 ## v1.0.2
 
 - AI model names are now configurable in `config.txt` instead of hardcoded, so a provider deprecating a model no longer requires a code update — just edit the model name yourself
