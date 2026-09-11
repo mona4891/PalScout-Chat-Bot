@@ -23,9 +23,15 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 try:
-    from duckduckgo_search import DDGS
+    # The package was renamed from duckduckgo_search to ddgs -- try
+    # the new name first, fall back to the old one so this keeps
+    # working either way depending on what's installed.
+    from ddgs import DDGS
 except ImportError:
-    DDGS = None
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        DDGS = None
 
 import requests
 
@@ -39,11 +45,25 @@ CURRENT_INFO_KEYWORDS = [
     "current version", "release date", "when is", "when does",
 ]
 
+# Keywords that suggest the person wants an actual video/link, not
+# just information -- these trigger a YouTube search instead of (or
+# alongside) a web search.
+YOUTUBE_KEYWORDS = [
+    "youtube", "video", "watch", "song", "music video",
+    "link to the song", "link to that song", "link to", "clip", "trailer",
+]
+
 
 def needs_current_info(question: str) -> bool:
     """Heuristic check: does this question likely need a web search?"""
     lowered = question.lower()
     return any(keyword in lowered for keyword in CURRENT_INFO_KEYWORDS)
+
+
+def needs_youtube_search(question: str) -> bool:
+    """Heuristic check: does this question likely want a video link?"""
+    lowered = question.lower()
+    return any(keyword in lowered for keyword in YOUTUBE_KEYWORDS)
 
 
 def web_search(query: str, max_results: int = 3) -> Optional[str]:
@@ -74,11 +94,42 @@ def web_search(query: str, max_results: int = 3) -> Optional[str]:
         return None
 
 
+# Common filler phrases that, left in, pollute a search query with
+# noise unrelated to the actual thing being searched for -- especially
+# damaging for the site-restricted fallback search, which is a literal
+# text match, not a semantic one.
+_YOUTUBE_FILLER_PATTERNS = [
+    r"\bcan you\b", r"\bcould you\b", r"\bplease\b",
+    r"\bgive me\b", r"\bfind me\b", r"\bsend me\b", r"\bshow me\b",
+    r"\bthe link to\b", r"\ba link to\b", r"\blink to\b", r"\blink for\b",
+    r"\bfrom youtube\b", r"\bon youtube\b", r"\byoutube\b",
+    r"\bvideo of\b", r"\bvideo for\b", r"\bthe video\b",
+    r"\bsong called\b", r"\bthe song\b",
+]
+
+
+def _clean_youtube_query(question: str) -> str:
+    """
+    Strips common request-phrasing filler from a natural-language
+    question, leaving (ideally) just the actual subject -- e.g. "give
+    me the link to heaven or las vegas from youtube, please" becomes
+    "heaven or las vegas". Not perfect, but removes the noise that
+    most damages a site-restricted search.
+    """
+    cleaned = question.lower()
+    for pattern in _YOUTUBE_FILLER_PATTERNS:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"[,.!?]+", " ", cleaned)  # drop stray punctuation
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or question  # fall back to the original if we stripped everything
+
+
 def youtube_search(query: str, api_key: Optional[str] = None) -> Optional[str]:
     """
     Searches YouTube and returns a title + direct link to the first
     result, or None if search fails.
     """
+    query = _clean_youtube_query(query)
     if api_key:
         return _youtube_search_official(query, api_key)
     return _youtube_search_fallback(query)

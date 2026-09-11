@@ -13,6 +13,7 @@ through the AI provider fallback chain.
 
 import logging
 import time
+from collections import deque
 from typing import List, Optional
 
 import search
@@ -45,12 +46,15 @@ class CommandHandler:
         self.youtube_search_enabled = youtube_search_enabled
         self.youtube_api_key = youtube_api_key
         self._last_command_time: dict = {}  # player_name -> timestamp of last command
+        self.recent_activity = deque(maxlen=30)  # recent AI Q&A, for the dashboard's activity feed
         self.system_prompt = (
-            f"You are {bot_name}, a helpful AI assistant for a game server. "
-            "You have access to live game data including player positions, "
-            "HP, levels, guilds, and nearby creatures. Use this information "
-            "to provide helpful, contextual responses. Be friendly and "
-            "conversational.\n\n"
+            f"You are {bot_name}, a helpful AI assistant for a Palworld game "
+            "server. You have access to live game data including player "
+            "positions, HP, levels, guilds, and nearby creatures called "
+            "'Pals' (the game refers to its creatures as Pals -- if someone "
+            "asks about a 'pal', they mean a nearby creature, not another "
+            "player). Use this information to provide helpful, contextual "
+            "responses. Be friendly and conversational.\n\n"
             "IMPORTANT -- YOU CANNOT PERFORM MODERATION ACTIONS YOURSELF: "
             "you have no ability to actually kick, ban, or warn anyone, "
             "even if asked to. If someone asks you (in conversation) to "
@@ -60,6 +64,9 @@ class CommandHandler:
             f"'{bot_prefix}warn <name>' -- those are separate commands "
             "an admin has to type directly, not something you can trigger "
             "by being asked in a question.\n\n"
+            "NEVER invent or guess a URL/link. Only share a link if one is "
+            "explicitly provided to you in the search results below -- if "
+            "none was found, say you couldn't find one.\n\n"
             "STRICT FORMAT RULES (this is raw in-game chat text, not a "
             "document, and these rules are never broken):\n"
             "- Maximum 1-2 short sentences, under 40 words total.\n"
@@ -99,6 +106,14 @@ class CommandHandler:
                 if results:
                     search_context = f"\n\nCurrent web search results (use these for up-to-date info):\n{results}"
 
+            if self.youtube_search_enabled and search.needs_youtube_search(question):
+                logger.info(f"[SEARCH] Question looks like it wants a video, searching YouTube: {question}")
+                video_result = search.youtube_search(question, api_key=self.youtube_api_key)
+                if video_result:
+                    search_context += f"\n\nYouTube search result (share this link directly, it's real and correct):\n{video_result}"
+                else:
+                    search_context += "\n\nNo YouTube video was found for this request -- say so plainly rather than inventing a link."
+
             user_content = f"{game_context}\n\n{chat_context}{search_context}\n\n{player_name} asks: {question}"
 
             messages = [
@@ -106,10 +121,25 @@ class CommandHandler:
                 {"role": "user", "content": user_content},
             ]
 
-            return self._strip_markdown(self.ai_chain.ask(messages))
+            answer = self._strip_markdown(self.ai_chain.ask(messages))
+            self._log_activity(player_name, question, answer, self.ai_chain.last_used_provider)
+            return answer
         except Exception as e:
             logger.error(f"[AI] Unexpected error building context or asking AI: {e}")
             return "An error occurred on my end. Try again."
+
+    def _log_activity(self, player_name: str, question: str, answer: str, provider: str):
+        """Records one AI Q&A for the dashboard's activity feed. Kept
+        separate from ChatHistory since that's about giving the AI
+        conversational context, not about being displayed -- this is
+        purely for admins to see what's being asked/answered."""
+        self.recent_activity.append({
+            "time": time.strftime("%H:%M:%S"),
+            "player": player_name,
+            "question": question,
+            "answer": answer,
+            "provider": provider.capitalize() if provider else "None",
+        })
 
     @staticmethod
     def _strip_markdown(text: str) -> str:

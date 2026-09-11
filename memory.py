@@ -50,6 +50,25 @@ class PermanentMemory:
         updated = f"{current}\n{note}".strip() if current else note
         self.save(updated)
 
+    def get_notes(self) -> list:
+        """Returns each memory note as a separate list entry (one per
+        line), skipping blank lines -- used by the dashboard to show
+        notes individually rather than as one big text blob."""
+        content = self.load()
+        return [line for line in content.splitlines() if line.strip()]
+
+    def delete_note(self, index: int) -> bool:
+        """Removes one note by its position (as returned by get_notes())
+        and rewrites the file with the rest. Returns False if the index
+        doesn't exist -- e.g. the note was already removed by another
+        request, or the list changed between reading and deleting."""
+        notes = self.get_notes()
+        if index < 0 or index >= len(notes):
+            return False
+        del notes[index]
+        self.save("\n".join(notes))
+        return True
+
 
 class ChatHistory:
     """

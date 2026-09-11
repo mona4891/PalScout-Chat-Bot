@@ -8,6 +8,7 @@ game-state summary for the AI to use.
 """
 
 import logging
+import time
 from typing import Dict, List, Optional
 import requests
 from requests.auth import HTTPBasicAuth
@@ -27,6 +28,7 @@ class GameServerAPI:
             "Accept": "application/json",
         })
         self.connected = False
+        self._last_connection_error_logged = 0  # timestamp, throttles repeated error spam
         # Since Palworld's /announce shows all bot messages under the
         # generic "SYSTEM" sender, prefixing with the bot's name makes
         # its responses visually distinguishable from other server
@@ -108,16 +110,38 @@ class GameServerAPI:
         Returns a full live world snapshot: every player and creature,
         with health, level, and position. This is the data source for
         grounding AI responses in real game state.
+
+        Also updates self.connected based on the outcome, since this is
+        by far the most frequently called endpoint (get_players() and
+        build_game_context() both go through it) -- without this, a
+        server that goes offline mid-session would leave self.connected
+        stuck at whatever it was during the initial startup check,
+        making the dashboard's "Online" status inaccurate.
         """
         try:
             resp = self.session.get(f"{self.base_url}/v1/api/game-data", timeout=5)
             if resp.status_code == 200:
+                self.connected = True
                 return resp.json()
-            logger.error(f"[SERVER] game-data returned status {resp.status_code}")
+            self._log_connection_error(f"game-data returned status {resp.status_code}")
+            self.connected = False
             return {}
         except requests.RequestException as e:
-            logger.error(f"[SERVER] Get game data failed: {e}")
+            self._log_connection_error(f"Get game data failed: {e}")
+            self.connected = False
             return {}
+
+    def _log_connection_error(self, message: str, min_interval_seconds: int = 30):
+        """
+        Logs a connection error, but at most once every
+        min_interval_seconds -- without this, a server that's offline
+        for an extended period would flood the console with the same
+        error every few seconds (the dashboard alone polls every 5s).
+        """
+        now = time.time()
+        if now - self._last_connection_error_logged >= min_interval_seconds:
+            logger.error(f"[SERVER] {message}")
+            self._last_connection_error_logged = now
 
     def find_player_by_name(self, name: str) -> Optional[Dict]:
         """
@@ -152,6 +176,15 @@ class GameServerAPI:
             return resp.status_code == 200
         except requests.RequestException as e:
             logger.error(f"[SERVER] Ban failed: {e}")
+            return False
+
+    def unban_player(self, player_id: str) -> bool:
+        """Unbans a player by their numeric ID."""
+        try:
+            resp = self.session.post(f"{self.base_url}/v1/api/unban", json={"userid": player_id}, timeout=5)
+            return resp.status_code == 200
+        except requests.RequestException as e:
+            logger.error(f"[SERVER] Unban failed: {e}")
             return False
 
     def build_game_context(self, asking_player_name: str = None) -> str:

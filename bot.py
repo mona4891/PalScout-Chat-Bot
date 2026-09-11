@@ -24,6 +24,7 @@ from memory import PermanentMemory, ChatHistory
 from commands import CommandHandler
 from chat_listener import tail_chatlog
 import discord_bridge
+import dashboard
 
 # Reuse the same BASE_DIR logic config.py already worked out --
 # correctly resolves to the .exe's real folder when frozen by
@@ -227,6 +228,24 @@ def main():
         discord_thread.start()
         logger.info("[DISCORD] Discord bridge thread started.")
 
+    if config.get("DASHBOARD_ENABLED", "false").lower() == "true":
+        dashboard_password = config.get("DASHBOARD_PASSWORD")
+        if not dashboard_password:
+            logger.warning("[DASHBOARD] DASHBOARD_ENABLED is true but no DASHBOARD_PASSWORD is set -- skipping dashboard startup.")
+        else:
+            dashboard_port = int(config.get("DASHBOARD_PORT", "5000"))
+            dashboard_thread = threading.Thread(
+                target=dashboard.start_dashboard,
+                args=(command_handler, dashboard_password, dashboard_port),
+                kwargs={
+                    "chat_filter": chat_filter,
+                    "verbose_logging": config.get("DASHBOARD_VERBOSE_LOGGING", "false").lower() == "true",
+                },
+                daemon=True,
+            )
+            dashboard_thread.start()
+            logger.info(f"[DASHBOARD] Dashboard thread started on port {dashboard_port}.")
+
     ban_check_thread = threading.Thread(
         target=periodic_expired_ban_check,
         args=(command_handler.moderation,),
@@ -240,9 +259,18 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
-        _shutdown_requested = True
-        server_api.send_chat(f"{bot_name} is going offline.")
+        # Wrapped in its own try/except: if a second Ctrl+C arrives
+        # while shutdown is still in progress (e.g. logging or the
+        # final chat message hasn't finished), Python raises another
+        # KeyboardInterrupt right in the middle of this cleanup code,
+        # which otherwise prints a confusing traceback even though
+        # the bot is shutting down correctly either way.
+        try:
+            logger.info("Shutting down...")
+            _shutdown_requested = True
+            server_api.send_chat(f"{bot_name} is going offline.")
+        except KeyboardInterrupt:
+            pass
         sys.exit(0)
 
 

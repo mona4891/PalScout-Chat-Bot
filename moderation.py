@@ -182,6 +182,34 @@ class ModerationSystem:
             return False  # expired
         return True
 
+    def unban_player_by_id(self, player_id: str) -> str:
+        """
+        Lifts a ban: calls the server to actually unban, and removes
+        the local record regardless of whether the server call
+        succeeds (a stale local ban record with no matching real ban
+        is more confusing than useful).
+        """
+        entry = self.bans.get(player_id)
+        name = entry.get("name", player_id) if entry else player_id
+
+        server_ok = self.server_api.unban_player(player_id)
+        if player_id in self.bans:
+            del self.bans[player_id]
+            self._save_json(self.bans_file, self.bans)
+
+        if server_ok:
+            self._append_log(self.ban_log_file, f"{name} unbanned")
+            return f"Unbanned {name}."
+        return f"Removed local ban record for {name}, but the server unban request failed -- they may still be banned server-side."
+
+    def get_all_bans(self) -> Dict:
+        """Returns the full bans dict, e.g. for displaying in the dashboard."""
+        return self.bans
+
+    def get_all_warnings(self) -> Dict:
+        """Returns the full warnings dict, e.g. for displaying in the dashboard."""
+        return self.warnings
+
     def get_expired_temp_bans(self) -> Dict:
         """Returns bans whose expiry time has passed but are still on record."""
         now = time.time()

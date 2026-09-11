@@ -48,6 +48,7 @@ class AIProviderChain:
         self.local_enabled = local_enabled
         self.failure_cooldown_seconds = failure_cooldown_seconds
         self.provider_fail_time = {}  # provider_name -> timestamp of last failure
+        self.last_used_provider = None  # updated after each successful ask(), for display purposes
 
         self.chain: List[Tuple[str, Callable, Callable]] = [
             ("groq", self._call_groq, lambda: bool(config.get("GROQ_API_KEY") and groq)),
@@ -155,12 +156,15 @@ class AIProviderChain:
 
         if self.local_enabled and self._is_local_available():
             try:
-                return trim(self._call_local(messages))
+                answer = trim(self._call_local(messages))
+                self.last_used_provider = "local"
+                return answer
             except Exception as e:
                 logger.info(f"[AI] Local model failed: {e} — falling back to cloud providers...")
 
         configured_count = len([n for n, _, is_cfg in self.chain if is_cfg()])
         if configured_count == 0:
+            self.last_used_provider = None
             return "No AI providers are configured. Please add an API key to config.txt."
 
         max_attempts = configured_count * 2  # allow a couple retry passes
@@ -175,10 +179,12 @@ class AIProviderChain:
                 answer = provider_func(messages)
                 logger.info(f"[AI] Response from {provider_name.capitalize()}")
                 self._clear_failed(provider_name)
+                self.last_used_provider = provider_name
                 return trim(answer)
             except Exception as e:
                 logger.info(f"[AI] {provider_name.capitalize()} failed: {e}")
                 self._mark_failed(provider_name)
                 attempts += 1
 
+        self.last_used_provider = None
         return "All AI providers are currently unavailable. Try again later."

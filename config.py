@@ -119,6 +119,23 @@ YOUTUBE_API_KEY=your-youtube-api-key-here
 # ── Discord Bridge (optional) ────────────────
 DISCORD_BOT_TOKEN=your-bot-token-here
 DISCORD_CHANNEL_ID=your-channel-id-here
+
+# ── Web Dashboard (optional) ──────────────────
+# View live stats and manage players/settings from a browser.
+# Visit http://localhost:5000 once running (or whatever port you set).
+DASHBOARD_ENABLED=false
+DASHBOARD_PORT=5000
+DASHBOARD_PASSWORD=your-dashboard-password-goes-here
+# When false (default), suppresses the per-request "GET /api/status
+# 200" lines the dashboard's web server logs on every page refresh --
+# useful noise while debugging the dashboard itself, but clutters the
+# console during normal use. Set to true to see them again.
+DASHBOARD_VERBOSE_LOGGING=false
+# Background image and content-panel color can be set from the
+# Customize tab in the dashboard itself -- these two lines are managed
+# automatically once you do, no need to edit them by hand.
+DASHBOARD_PANEL_COLOR=#1a2320
+DASHBOARD_PANEL_OPACITY=88
 """
 
 
@@ -165,3 +182,57 @@ def require(config: dict, key: str, friendly_name: str = None) -> str:
         logger.error(f"[CONFIG] Missing required setting: {name} (set {key} in config.txt)")
         sys.exit(1)
     return value
+
+
+def update_config_value(key: str, value: str) -> bool:
+    """
+    Updates a single setting in config.txt on disk, so changes made
+    from the dashboard (toggles, model names, banned words) survive a
+    restart instead of only applying to the current running session.
+
+    Rewrites only the matching "KEY=..." line, preserving every other
+    line (comments, formatting, unrelated settings) exactly as-is. If
+    the key doesn't exist yet in the file, appends it at the end
+    rather than failing silently.
+
+    Returns True on success, False if the file couldn't be read/written
+    (e.g. permissions issue) -- callers should treat a False return as
+    "the in-memory change worked, but wasn't saved to disk" rather than
+    a hard failure.
+    """
+    if not os.path.exists(CONFIG_FILE):
+        logger.error(f"[CONFIG] Cannot update {key}: config.txt doesn't exist.")
+        return False
+
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError as e:
+        logger.error(f"[CONFIG] Failed to read config.txt: {e}")
+        return False
+
+    found = False
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(f"{key}=") or stripped.startswith(f"{key} ="):
+            new_lines.append(f"{key}={value}\n")
+            found = True
+        else:
+            new_lines.append(line)
+
+    if not found:
+        # Key wasn't in the file at all (e.g. an older config.txt
+        # predating this setting) -- add it rather than losing the change.
+        if new_lines and not new_lines[-1].endswith("\n"):
+            new_lines.append("\n")
+        new_lines.append(f"{key}={value}\n")
+
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        logger.info(f"[CONFIG] Updated {key} in config.txt")
+        return True
+    except OSError as e:
+        logger.error(f"[CONFIG] Failed to write config.txt: {e}")
+        return False
