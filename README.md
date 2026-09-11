@@ -21,6 +21,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 - **Optional auto-moderation** — toggleable chat filter for banned words, excessive caps, and spam, off by default
 - **Permanent memory** — save notes for the AI to remember with `!ai remember`
 - **Optional Discord bridge** — run the same commands from Discord, not just in-game
+- **Web dashboard** — a local browser interface (optional, password-protected) to view live status, manage players, review warnings and bans, tune AI providers, edit settings, and customize the dashboard's look — no more editing `config.txt` by hand for everyday admin tasks
 - **No RCON dependency** — built entirely on Palworld's REST API, since RCON is being phased out by the developers
 
 ## Requirements
@@ -34,7 +35,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 
 ### Option A — prebuilt .exe (recommended, no Python needed)
 
-1. Download `PalScout.exe` from the [latest release](https://github.com/mona4891/PalScout-Chat-Bot/releases/latest)
+1. Download `PalScout.exe` from the [latest release](https://github.com/your-github-url-here/releases/latest)
 2. Follow steps 3–5 below to install UE4SS and the chat-logging mod
 3. Run `PalScout.exe` once to generate a `config.txt` template next to it
 4. Fill in `config.txt`, then run `PalScout.exe` again
@@ -44,7 +45,7 @@ PalScout is an AI-powered chatbot and moderation tool for Palworld dedicated ser
 1. Clone or download this repository into its own folder
 2. Install dependencies:
    ```
-   pip install requests groq openai discord.py duckduckgo-search
+   pip install requests groq openai discord.py duckduckgo-search flask
    ```
 3. Install [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS/releases) on your server if you haven't already (unzip into `Pal\Binaries\Win64`)
 4. Copy the `PalScoutChatLogger` folder from this repo into your server's `Pal\Binaries\Win64\Mods\` folder. The folder structure should look like:
@@ -83,6 +84,7 @@ All settings live in `config.txt`, created automatically on first run. Key field
 | `AUTO_MODERATION_ENABLED` / `BANNED_WORDS` | Toggle the chat filter and set banned words (comma-separated) |
 | `WEB_SEARCH_ENABLED` / `YOUTUBE_SEARCH_ENABLED` / `YOUTUBE_API_KEY` | Toggle search features; YouTube API key is optional (falls back to web search without it) |
 | `DISCORD_BOT_TOKEN` / `DISCORD_CHANNEL_ID` | Optional, enables the Discord bridge |
+| `DASHBOARD_ENABLED` / `DASHBOARD_PORT` / `DASHBOARD_PASSWORD` | Optional, enables the web dashboard at `http://localhost:5000` (or your chosen port) |
 
 ## Commands
 
@@ -118,6 +120,7 @@ commands.py            # Command routing, permission checks, and cooldown handli
 search.py              # Web and YouTube search
 discord_bridge.py      # Optional Discord integration
 bot.py                 # Main entry point
+dashboard.py            # Optional web dashboard (Status, Players, Moderation, AI & Search, Settings, Memory & Activity, Customize)
 PalScoutChatLogger/    # UE4SS Lua mod — writes chat to a log file the bot can read
 ```
 

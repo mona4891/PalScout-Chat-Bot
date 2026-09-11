@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.0 — Web Dashboard
+
+- Added an optional local web dashboard (`DASHBOARD_ENABLED=true` in `config.txt`), password-protected, with six sections:
+  - **Status** — live connection state, player count, in-game time, active AI provider
+  - **Players** — HP, nearby creatures with real distances, admin/player role, kick/ban/warn buttons
+  - **Moderation** — warnings and active bans (with live countdown for temp bans), unban/clear-warning actions, auto-moderation toggle and banned-word list editor, one-click backup export
+  - **AI and search** — per-provider status and cooldown, editable model names, web/YouTube search toggles, a live "test the AI" box
+  - **Settings** — bot name/prefix, anti-spam cooldown, warning limit, admin Steam ID management, Discord bridge config, verbose logging toggle
+  - **Memory and activity** — view and delete `!ai remember` notes, a live feed of recent AI questions and answers
+  - **Customize** — upload a background image and choose the content panel's color/opacity, both persisted on disk
+- All dashboard settings changes are saved directly to `config.txt` and survive a restart
+- Fixed: `!kick`/`!ban`/`!warn` from the dashboard now correctly block targeting an admin, matching in-game command behavior
+- Fixed: live connection status now updates continuously instead of only reflecting the state at bot startup
+- Fixed: repeated connection-error log spam when the Palworld server is unreachable is now throttled
+- Fixed: a crash from certain Unicode characters in AI responses on Windows consoles
+- Fixed: the AI could falsely claim to have performed a kick/ban/warn when asked conversationally instead of via the real command
+- Fixed: the AI didn't understand "Pal" refers to the game's creatures, sometimes confusing it with "player"
+- Fixed: YouTube search query cleanup and switched to the current `ddgs` package (renamed from `duckduckgo-search`)
+
 ## Distribution
 
 PalScout is now available on multiple platforms:
